@@ -1,0 +1,2680 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+        <title>Dengue PINN v3 — FastAPI</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #05080f;
+                --s1: #0b1120;
+                --s2: #0f1a2e;
+                --border: #162840;
+                --border2: #1d3554;
+                --cyan: #00cfff;
+                --cyan-dim: rgba(0, 207, 255, 0.08);
+                --green: #05d877;
+                --green-dim: rgba(5, 216, 119, 0.08);
+                --yellow: #f5c518;
+                --yellow-dim: rgba(245, 197, 24, 0.08);
+                --red: #f03e3e;
+                --red-dim: rgba(240, 62, 62, 0.08);
+                --orange: #f97316;
+                --orange-dim: rgba(249, 115, 22, 0.08);
+                --text: #b8d4e8;
+                --text2: #7a9ab5;
+                --faint: #2a3f58;
+                --df: #05d877;
+                --dhf: #f97316;
+                --dss: #f03e3e;
+                --r: 10px;
+            }
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: "Syne", sans-serif;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+            .bg-grid {
+                position: fixed;
+                inset: 0;
+                z-index: 0;
+                pointer-events: none;
+                background-image:
+                    linear-gradient(
+                        rgba(0, 207, 255, 0.018) 1px,
+                        transparent 1px
+                    ),
+                    linear-gradient(
+                        90deg,
+                        rgba(0, 207, 255, 0.018) 1px,
+                        transparent 1px
+                    );
+                background-size: 56px 56px;
+            }
+            .orb {
+                position: fixed;
+                border-radius: 50%;
+                filter: blur(130px);
+                pointer-events: none;
+                z-index: 0;
+            }
+            .o1 {
+                width: 560px;
+                height: 560px;
+                top: -220px;
+                right: -120px;
+                background: rgba(0, 180, 255, 0.03);
+            }
+            .o2 {
+                width: 380px;
+                height: 380px;
+                bottom: -120px;
+                left: -80px;
+                background: rgba(5, 216, 119, 0.022);
+            }
+
+            /* ── Header ── */
+            header {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                padding: 12px 32px;
+                border-bottom: 1px solid var(--border);
+                background: rgba(5, 8, 15, 0.95);
+                backdrop-filter: blur(20px);
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                flex-wrap: wrap;
+            }
+            .logo {
+                width: 36px;
+                height: 36px;
+                border: 1.5px solid var(--cyan);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 14px;
+                color: var(--cyan);
+                background: rgba(0, 207, 255, 0.06);
+                font-weight: 600;
+                flex-shrink: 0;
+            }
+            .title {
+                flex: 1;
+            }
+            .title h1 {
+                font-size: 16px;
+                font-weight: 800;
+                letter-spacing: -0.2px;
+            }
+            .title h1 span {
+                color: var(--cyan);
+            }
+            .subtitle {
+                font-size: 10px;
+                color: var(--text2);
+                font-family: "IBM Plex Mono", monospace;
+                margin-top: 1px;
+                letter-spacing: 0.3px;
+            }
+
+            /* API bar */
+            .api-bar {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-left: auto;
+                flex-wrap: wrap;
+            }
+            .api-label {
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 10px;
+                color: var(--text2);
+            }
+            #apiBase {
+                background: var(--s2);
+                border: 1px solid var(--border2);
+                border-radius: 6px;
+                color: var(--cyan);
+                padding: 6px 11px;
+                font-size: 11px;
+                font-family: "IBM Plex Mono", monospace;
+                outline: none;
+                width: 220px;
+                transition: border-color 0.15s;
+            }
+            #apiBase:focus {
+                border-color: var(--cyan);
+            }
+            .ping-btn {
+                padding: 6px 12px;
+                border-radius: 6px;
+                border: 1px solid var(--cyan);
+                background: var(--cyan-dim);
+                color: var(--cyan);
+                cursor: pointer;
+                font-size: 10px;
+                font-family: "IBM Plex Mono", monospace;
+                font-weight: 600;
+                transition: all 0.12s;
+            }
+            .ping-btn:hover {
+                background: rgba(0, 207, 255, 0.15);
+            }
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--faint);
+                flex-shrink: 0;
+                transition: all 0.3s;
+            }
+            .dot.ok {
+                background: var(--green);
+                box-shadow: 0 0 8px var(--green);
+            }
+            .dot.err {
+                background: var(--red);
+            }
+            .dot.checking {
+                background: var(--yellow);
+                animation: blink 0.8s infinite;
+            }
+            @keyframes blink {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.3;
+                }
+            }
+            #statusTxt {
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 10px;
+                color: var(--text2);
+            }
+
+            /* ── Layout ── */
+            .wrap {
+                position: relative;
+                z-index: 5;
+                max-width: 1480px;
+                margin: 0 auto;
+                padding: 22px 32px;
+            }
+
+            /* Tabs */
+            .tabs {
+                display: flex;
+                gap: 2px;
+                margin-bottom: 20px;
+                background: var(--s1);
+                border-radius: 9px;
+                padding: 4px;
+                width: fit-content;
+                border: 1px solid var(--border);
+            }
+            .tab {
+                padding: 7px 18px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+                color: var(--text2);
+                transition: all 0.15s;
+                border: none;
+                background: none;
+                font-family: "Syne", sans-serif;
+            }
+            .tab.active {
+                background: var(--cyan);
+                color: #05080f;
+            }
+            .tab:hover:not(.active) {
+                color: var(--text);
+                background: var(--s2);
+            }
+            .panel {
+                display: none;
+            }
+            .panel.active {
+                display: block;
+                animation: up 0.2s ease;
+            }
+            @keyframes up {
+                from {
+                    opacity: 0;
+                    transform: translateY(5px);
+                }
+                to {
+                    opacity: 1;
+                    transform: none;
+                }
+            }
+
+            /* Grid */
+            .main-grid {
+                display: grid;
+                grid-template-columns: 380px 1fr;
+                gap: 18px;
+                align-items: start;
+            }
+            .card {
+                background: var(--s1);
+                border: 1px solid var(--border);
+                border-radius: var(--r);
+                padding: 20px;
+                position: relative;
+            }
+            .card-hd {
+                font-size: 9px;
+                font-family: "IBM Plex Mono", monospace;
+                color: var(--cyan);
+                letter-spacing: 2.5px;
+                text-transform: uppercase;
+                margin-bottom: 14px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .card-hd::after {
+                content: "";
+                flex: 1;
+                height: 1px;
+                background: linear-gradient(
+                    to right,
+                    var(--border2),
+                    transparent
+                );
+            }
+
+            /* Form */
+            .who-note {
+                background: rgba(245, 197, 24, 0.06);
+                border: 1px solid rgba(245, 197, 24, 0.2);
+                border-radius: 7px;
+                padding: 9px 12px;
+                margin-bottom: 14px;
+                font-size: 10px;
+                font-family: "IBM Plex Mono", monospace;
+                color: var(--yellow);
+                line-height: 1.7;
+            }
+            .fg {
+                margin-bottom: 10px;
+            }
+            .fl {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 10px;
+                color: var(--text2);
+                margin-bottom: 4px;
+                font-family: "IBM Plex Mono", monospace;
+            }
+            .fl .fv {
+                color: var(--cyan);
+                font-weight: 600;
+            }
+            .fl .fu {
+                color: var(--faint);
+                font-size: 9px;
+            }
+            .fl .fw {
+                color: var(--yellow);
+                font-size: 9px;
+            }
+            select,
+            input[type="number"] {
+                width: 100%;
+                background: var(--s2);
+                border: 1px solid var(--border2);
+                border-radius: 6px;
+                color: var(--text);
+                padding: 7px 10px;
+                font-size: 12px;
+                font-family: "IBM Plex Mono", monospace;
+                outline: none;
+                transition: border-color 0.15s;
+            }
+            select:focus,
+            input:focus {
+                border-color: var(--cyan);
+            }
+            input[type="range"] {
+                width: 100%;
+                height: 3px;
+                border-radius: 2px;
+                outline: none;
+                border: none;
+                background: var(--border2);
+                cursor: pointer;
+                accent-color: var(--cyan);
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 13px;
+                height: 13px;
+                border-radius: 50%;
+                background: var(--cyan);
+                cursor: pointer;
+                border: 2px solid var(--bg);
+            }
+            .sep {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin: 10px 0;
+            }
+            .sl {
+                flex: 1;
+                height: 1px;
+                background: var(--border);
+            }
+            .st {
+                font-size: 8px;
+                font-family: "IBM Plex Mono", monospace;
+                color: var(--faint);
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            }
+            .hint {
+                font-size: 9px;
+                color: var(--faint);
+                font-family: "IBM Plex Mono", monospace;
+                margin-top: 2px;
+            }
+
+            /* Buttons */
+            .btn-run {
+                width: 100%;
+                padding: 11px;
+                border-radius: 8px;
+                border: none;
+                cursor: pointer;
+                font-family: "Syne", sans-serif;
+                font-weight: 700;
+                font-size: 13px;
+                background: linear-gradient(135deg, var(--cyan), #008eb5);
+                color: #05080f;
+                transition: all 0.15s;
+                letter-spacing: 0.2px;
+                margin-top: 6px;
+            }
+            .btn-run:hover:not(:disabled) {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 24px rgba(0, 207, 255, 0.25);
+            }
+            .btn-run:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .preset-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 5px;
+                margin-top: 7px;
+            }
+            .pb {
+                padding: 7px 2px;
+                border-radius: 6px;
+                border: 1px solid;
+                font-size: 10px;
+                font-family: "IBM Plex Mono", monospace;
+                cursor: pointer;
+                background: transparent;
+                transition: all 0.12s;
+                font-weight: 600;
+            }
+            .pb-df {
+                border-color: var(--df);
+                color: var(--df);
+            }
+            .pb-dhf {
+                border-color: var(--dhf);
+                color: var(--dhf);
+            }
+            .pb-dss {
+                border-color: var(--dss);
+                color: var(--dss);
+            }
+
+            /* Output */
+            .metrics4 {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin-bottom: 12px;
+            }
+            .om {
+                background: var(--s2);
+                border: 1px solid var(--border2);
+                border-radius: 9px;
+                padding: 13px;
+                text-align: center;
+            }
+            .om.hi {
+                border-width: 2px;
+            }
+            .om-l {
+                font-size: 8px;
+                font-family: "IBM Plex Mono", monospace;
+                color: var(--text2);
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            }
+            .om-v {
+                font-size: 26px;
+                font-weight: 800;
+                margin: 5px 0;
+                font-family: "IBM Plex Mono", monospace;
+                line-height: 1;
+            }
+            .om-s {
+                font-size: 9px;
+                color: var(--text2);
+                font-family: "IBM Plex Mono", monospace;
+            }
+            .c-df {
+                color: var(--df);
+            }
+            .c-dhf {
+                color: var(--dhf);
+            }
+            .c-dss {
+                color: var(--dss);
+            }
+            .c-cy {
+                color: var(--cyan);
+            }
+
+            /* Prob bars */
+            .prob-section {
+                background: var(--s2);
+                border: 1px solid var(--border2);
+                border-radius: 9px;
+                padding: 13px;
+                margin-bottom: 10px;
+            }
+            .pb-row {
+                margin-bottom: 8px;
+            }
+            .pb-hd {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 3px;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            .prog {
+                background: var(--border);
+                border-radius: 3px;
+                height: 5px;
+                overflow: hidden;
+            }
+            .progf {
+                height: 100%;
+                border-radius: 3px;
+                transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            /* Marker flags */
+            .flag-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 7px;
+                margin-bottom: 11px;
+            }
+            .flag-box {
+                background: var(--s2);
+                border: 1px solid var(--border2);
+                border-radius: 8px;
+                padding: 9px 11px;
+            }
+            .flag-box.flagged {
+                border-color: rgba(240, 62, 62, 0.35);
+            }
+            .flag-name {
+                font-size: 9px;
+                font-family: "IBM Plex Mono", monospace;
+                color: var(--text2);
+                letter-spacing: 1px;
+                margin-bottom: 3px;
+            }
+            .flag-bar-wrap {
+                background: var(--border);
+                border-radius: 2px;
+                height: 3px;
+                overflow: hidden;
+                margin-bottom: 3px;
+            }
+            .flag-bar {
+                height: 100%;
+                border-radius: 2px;
+            }
+            .flag-vals {
+                display: flex;
+                justify-content: space-between;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 9px;
+            }
+
+            /* Alert */
+            .alert {
+                border-radius: 9px;
+                padding: 13px;
+                margin-top: 10px;
+                border: 1px solid;
+                font-size: 12px;
+                line-height: 1.8;
+            }
+            .alert-df {
+                background: var(--green-dim);
+                border-color: rgba(5, 216, 119, 0.25);
+            }
+            .alert-dhf {
+                background: var(--orange-dim);
+                border-color: rgba(249, 115, 22, 0.25);
+            }
+            .alert-dss {
+                background: var(--red-dim);
+                border-color: rgba(240, 62, 62, 0.3);
+            }
+            .who-met {
+                background: var(--yellow-dim);
+                border: 1px solid rgba(245, 197, 24, 0.3);
+                border-radius: 9px;
+                padding: 9px 13px;
+                font-size: 11px;
+                color: var(--yellow);
+                font-family: "IBM Plex Mono", monospace;
+                margin-top: 8px;
+            }
+            .who-ok {
+                background: var(--green-dim);
+                border: 1px solid rgba(5, 216, 119, 0.2);
+                border-radius: 9px;
+                padding: 9px 13px;
+                font-size: 11px;
+                color: var(--green);
+                font-family: "IBM Plex Mono", monospace;
+                margin-top: 8px;
+            }
+
+            /* Log */
+            .logbox {
+                background: #020407;
+                border: 1px solid var(--border);
+                border-radius: 7px;
+                padding: 11px;
+                height: 120px;
+                overflow-y: auto;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 10px;
+                scrollbar-width: thin;
+                scrollbar-color: var(--border) transparent;
+            }
+            .ll {
+                margin: 2px 0;
+                line-height: 1.5;
+            }
+            .ll-ok {
+                color: var(--green);
+            }
+            .ll-warn {
+                color: var(--yellow);
+            }
+            .ll-info {
+                color: var(--cyan);
+            }
+            .ll-dim {
+                color: var(--text2);
+            }
+            .ll-err {
+                color: var(--red);
+            }
+
+            /* JSON box */
+            .json-box {
+                background: #020407;
+                border: 1px solid var(--border);
+                border-radius: 7px;
+                padding: 12px;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 10px;
+                color: var(--green);
+                max-height: 240px;
+                overflow-y: auto;
+                line-height: 1.8;
+                white-space: pre-wrap;
+                word-break: break-all;
+                scrollbar-width: thin;
+                scrollbar-color: var(--border) transparent;
+            }
+
+            /* Spinner */
+            .spin {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                border: 2px solid rgba(0, 207, 255, 0.3);
+                border-top-color: var(--cyan);
+                border-radius: 50%;
+                animation: rotate 0.7s linear infinite;
+                vertical-align: middle;
+                margin-right: 5px;
+            }
+            @keyframes rotate {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            /* Stat rows */
+            .sr {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 6px 0;
+                border-bottom: 1px solid rgba(22, 40, 64, 0.8);
+                font-size: 12px;
+            }
+            .sr:last-child {
+                border-bottom: none;
+            }
+            .sk {
+                color: var(--text2);
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 10px;
+            }
+            .sv {
+                font-weight: 700;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 12px;
+            }
+
+            /* WHO table */
+            .who-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-family: "IBM Plex Mono", monospace;
+                font-size: 11px;
+            }
+            .who-table th {
+                padding: 7px 10px;
+                background: var(--s2);
+                color: var(--cyan);
+                font-weight: 600;
+                text-align: left;
+                border-bottom: 1px solid var(--border2);
+            }
+            .who-table td {
+                padding: 7px 10px;
+                border-bottom: 1px solid var(--border);
+                color: var(--text);
+            }
+            .tag-df {
+                color: var(--df);
+                font-weight: 700;
+            }
+            .tag-dhf {
+                color: var(--dhf);
+                font-weight: 700;
+            }
+            .tag-dss {
+                color: var(--dss);
+                font-weight: 700;
+            }
+
+            /* Batch */
+            .two-col {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
+            .three-col {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 16px;
+            }
+
+            canvas {
+                width: 100% !important;
+                border-radius: 8px;
+            }
+
+            @media (max-width: 1050px) {
+                .main-grid,
+                .two-col,
+                .three-col {
+                    grid-template-columns: 1fr;
+                }
+                .wrap {
+                    padding: 14px 14px;
+                }
+                header {
+                    padding: 10px 14px;
+                }
+                .api-bar {
+                    margin-left: 0;
+                    width: 100%;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="bg-grid"></div>
+        <div class="orb o1"></div>
+        <div class="orb o2"></div>
+
+        <header>
+            <div class="logo">Φ</div>
+            <div class="title">
+                <h1>Dengue <span>PINN</span> v3 — FastAPI</h1>
+                <div class="subtitle">
+                    13 markers · WHO 2009 · PyTorch trained · Pakistan 2023
+                    (N=268) · POST /predict
+                </div>
+            </div>
+            <div class="api-bar">
+                <span class="api-label">API</span>
+                <input
+                    id="apiBase"
+                    value="http://localhost:8000"
+                    placeholder="http://localhost:8000"
+                />
+                <button class="ping-btn" onclick="ping()">Ping</button>
+                <button
+                    class="ping-btn"
+                    id="mockToggle"
+                    onclick="toggleMock()"
+                    style="
+                        border-color: var(--yellow);
+                        color: var(--yellow);
+                        background: rgba(245, 197, 24, 0.08);
+                    "
+                >
+                    Mock OFF
+                </button>
+                <div class="dot" id="dot"></div>
+                <span id="statusTxt">not checked</span>
+            </div>
+        </header>
+
+        <div class="wrap">
+            <div class="tabs">
+                <button
+                    class="tab active"
+                    data-tab="pinn"
+                    onclick="switchTab(this)"
+                >
+                    🧠 PINN Predict
+                </button>
+                <button class="tab" data-tab="batch" onclick="switchTab(this)">
+                    📦 Batch
+                </button>
+                <button class="tab" data-tab="cohort" onclick="switchTab(this)">
+                    📊 Cohort
+                </button>
+                <button
+                    class="tab"
+                    data-tab="criteria"
+                    onclick="switchTab(this)"
+                >
+                    📋 WHO Criteria
+                </button>
+                <button class="tab" data-tab="setup" onclick="switchTab(this)">
+                    ⚙ Setup
+                </button>
+            </div>
+
+            <!-- ═══ TAB 1: PREDICT ══════════════════════════════════════ -->
+            <div id="tab-pinn" class="panel active">
+                <div class="main-grid">
+                    <!-- Left: Input -->
+                    <div
+                        style="display: flex; flex-direction: column; gap: 13px"
+                    >
+                        <div class="card">
+                            <div class="card-hd">
+                                Patient Input — 13 Biomarkers
+                            </div>
+                            <div class="who-note">
+                                ⚠ WHO 2009: DHF requires Plt&lt;100k + HCT ≥20%
+                                rise<br />DSS requires DHF + circulatory shock
+                            </div>
+
+                            <!-- Demographics -->
+                            <div
+                                style="
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 8px;
+                                "
+                            >
+                                <div class="fg">
+                                    <div class="fl"><span>Sex</span></div>
+                                    <select id="sex">
+                                        <option value="male">Male (65%)</option>
+                                        <option value="female">
+                                            Female (35%)
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Age</span
+                                        ><span class="fu">yrs</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="age"
+                                        value="40"
+                                        min="5"
+                                        max="99"
+                                        step="1"
+                                    />
+                                </div>
+                            </div>
+                            <div class="fg">
+                                <div class="fl">
+                                    <span>Disease Day</span
+                                    ><span class="fu">1–14</span>
+                                </div>
+                                <input
+                                    type="number"
+                                    id="tday"
+                                    value="5"
+                                    min="1"
+                                    max="14"
+                                    step="1"
+                                />
+                            </div>
+
+                            <div class="sep">
+                                <div class="sl"></div>
+                                <div class="st">🫀 Hepatic</div>
+                                <div class="sl"></div>
+                            </div>
+                            <div
+                                style="
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 8px;
+                                "
+                            >
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>ALT</span
+                                        ><span class="fu">IU/L · n:9–41</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="alt"
+                                        value="78"
+                                        min="1"
+                                        max="2000"
+                                        step="1"
+                                    />
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>AST ★</span
+                                        ><span class="fu">IU/L · n:10–35</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="ast"
+                                        value="90"
+                                        min="1"
+                                        max="3000"
+                                        step="1"
+                                    />
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>ALP ★ DSS</span
+                                        ><span class="fu">IU/L · n:70–306</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="alp"
+                                        value="220"
+                                        min="1"
+                                        max="5000"
+                                        step="1"
+                                    />
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Bilirubin</span
+                                        ><span class="fw">↑&gt;1.5=DHF</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="bil"
+                                        value="0.8"
+                                        min="0.1"
+                                        max="30"
+                                        step="0.1"
+                                    />
+                                </div>
+                                <div class="fg" style="grid-column: 1/-1">
+                                    <div class="fl">
+                                        <span>Albumin</span
+                                        ><span class="fw">↓&lt;3.5=DSS</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="alb"
+                                        value="4.0"
+                                        min="1.0"
+                                        max="6.0"
+                                        step="0.1"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="sep">
+                                <div class="sl"></div>
+                                <div class="st">🩸 Haematological (WHO)</div>
+                                <div class="sl"></div>
+                            </div>
+                            <div
+                                style="
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 8px;
+                                "
+                            >
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Platelets ★</span
+                                        ><span class="fw">↓&lt;100=DHF</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="plt"
+                                        value="150"
+                                        min="5"
+                                        max="800"
+                                        step="1"
+                                    />
+                                    <div class="hint">
+                                        ×10³/μL · Normal: 150–400
+                                    </div>
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Hematocrit ★</span
+                                        ><span class="fw">≥20% rise=DHF</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="hct"
+                                        value="42"
+                                        min="15"
+                                        max="70"
+                                        step="0.1"
+                                    />
+                                    <div class="hint">% · M:42–52 F:37–47</div>
+                                </div>
+                                <div class="fg" style="grid-column: 1/-1">
+                                    <div class="fl">
+                                        <span>WBC</span
+                                        ><span class="fw"
+                                            >↓&lt;5 leukopenia</span
+                                        >
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="wbc"
+                                        value="5.0"
+                                        min="0.1"
+                                        max="30"
+                                        step="0.1"
+                                    />
+                                    <div class="hint">
+                                        ×10³/μL · Normal: 4–11
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sep">
+                                <div class="sl"></div>
+                                <div class="st">🫘 Renal</div>
+                                <div class="sl"></div>
+                            </div>
+                            <div
+                                style="
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 8px;
+                                "
+                            >
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Urea</span
+                                        ><span class="fu">mg/dL · n:20–50</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="urea"
+                                        value="31"
+                                        min="5"
+                                        max="300"
+                                        step="1"
+                                    />
+                                </div>
+                                <div class="fg">
+                                    <div class="fl">
+                                        <span>Creatinine</span
+                                        ><span class="fu"
+                                            >mg/dL · n:0.7–1.1</span
+                                        >
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id="creat"
+                                        value="1.0"
+                                        min="0.1"
+                                        max="15"
+                                        step="0.1"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                class="btn-run"
+                                id="btnRun"
+                                onclick="runPredict()"
+                                style="
+                                    margin-top: 14px;
+                                    font-size: 14px;
+                                    padding: 14px;
+                                    letter-spacing: 0.5px;
+                                "
+                            >
+                                ▶ Run PINN via FastAPI
+                            </button>
+                            <div
+                                style="
+                                    font-size: 9px;
+                                    font-family:
+                                        &quot;IBM Plex Mono&quot;, monospace;
+                                    color: var(--text2);
+                                    text-align: center;
+                                    margin-top: 10px;
+                                    margin-bottom: 4px;
+                                    letter-spacing: 1px;
+                                "
+                            >
+                                QUICK PRESETS — LOAD SAMPLE PATIENT
+                            </div>
+                            <div class="preset-row">
+                                <button
+                                    class="pb pb-df"
+                                    onclick="loadPreset('df')"
+                                >
+                                    🟢 DF — Mild
+                                </button>
+                                <button
+                                    class="pb pb-dhf"
+                                    onclick="loadPreset('dhf')"
+                                >
+                                    🟠 DHF — Moderate
+                                </button>
+                                <button
+                                    class="pb pb-dss"
+                                    onclick="loadPreset('dss')"
+                                >
+                                    🔴 DSS — Severe
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-hd">System Log</div>
+                            <div class="logbox" id="logbox">
+                                <div class="ll ll-info">
+                                    [INIT] Dengue PINN v3 · FastAPI client ready
+                                </div>
+                                <div class="ll ll-dim">
+                                    [INFO] API URL: http://localhost:8000
+                                </div>
+                                <div class="ll ll-warn">
+                                    [STEP] 1. cd ~/Desktop/dengue
+                                </div>
+                                <div class="ll ll-warn">
+                                    [STEP] 2. python3 "dengue pinn.py"
+                                </div>
+                                <div class="ll ll-warn">
+                                    [STEP] 3. Click Ping → then Run PINN
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Output -->
+                    <div
+                        style="display: flex; flex-direction: column; gap: 13px"
+                    >
+                        <div class="card">
+                            <div class="card-hd">Prediction Output</div>
+                            <div id="output">
+                                <div
+                                    style="
+                                        text-align: center;
+                                        padding: 50px 20px;
+                                        color: var(--text2);
+                                    "
+                                >
+                                    <div
+                                        style="
+                                            font-size: 52px;
+                                            margin-bottom: 12px;
+                                        "
+                                    >
+                                        🧬
+                                    </div>
+                                    <div
+                                        style="
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                            color: var(--cyan);
+                                            margin-bottom: 16px;
+                                        "
+                                    >
+                                        Ready to Predict
+                                    </div>
+                                    <div
+                                        style="
+                                            font-family:
+                                                &quot;IBM Plex Mono&quot;,
+                                                monospace;
+                                            font-size: 11px;
+                                            line-height: 2.2;
+                                            background: var(--s2);
+                                            border: 1px solid var(--border2);
+                                            border-radius: 10px;
+                                            padding: 16px;
+                                            text-align: left;
+                                            max-width: 320px;
+                                            margin: 0 auto;
+                                        "
+                                    >
+                                        <span style="color: var(--text2)"
+                                            >① Pick a preset below</span
+                                        ><br />
+                                        <span style="color: var(--text2)"
+                                            >② Or type your own values</span
+                                        ><br />
+                                        <span style="color: var(--text2)"
+                                            >③ Click </span
+                                        ><strong style="color: var(--cyan)"
+                                            >▶ Run PINN via FastAPI</strong
+                                        ><br />
+                                        <span style="color: var(--text2)"
+                                            >④ Results appear here
+                                            instantly</span
+                                        >
+                                    </div>
+                                    <div
+                                        style="
+                                            margin-top: 16px;
+                                            font-size: 10px;
+                                            font-family:
+                                                &quot;IBM Plex Mono&quot;,
+                                                monospace;
+                                            color: var(--faint);
+                                        "
+                                    >
+                                        No server? Enable
+                                        <span style="color: var(--yellow)"
+                                            >Mock ON</span
+                                        >
+                                        in the top bar
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" id="traj-card" style="display: none">
+                            <div class="card-hd">
+                                ODE Trajectory (Euler Integration · Days 0–14)
+                            </div>
+                            <canvas id="trajChart" height="140"></canvas>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-hd">
+                                Raw API Response · POST /predict
+                            </div>
+                            <div class="json-box" id="jsonBox">
+                                // Response JSON appears here after prediction
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 2: BATCH ════════════════════════════════════════ -->
+            <div id="tab-batch" class="panel">
+                <div class="two-col" style="margin-bottom: 16px">
+                    <div class="card">
+                        <div class="card-hd">
+                            Batch Input · POST /predict/batch
+                        </div>
+                        <div
+                            style="
+                                font-size: 10px;
+                                color: var(--text2);
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                line-height: 1.9;
+                                margin-bottom: 10px;
+                            "
+                        >
+                            JSON array of up to 50 patients (all 13 fields
+                            required).
+                        </div>
+                        <textarea
+                            id="batchJson"
+                            style="
+                                width: 100%;
+                                height: 320px;
+                                background: #020407;
+                                border: 1px solid var(--border2);
+                                border-radius: 7px;
+                                color: var(--green);
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 10px;
+                                padding: 11px;
+                                outline: none;
+                                resize: vertical;
+                                line-height: 1.8;
+                            "
+                        ></textarea>
+                        <div style="display: flex; gap: 8px; margin-top: 9px">
+                            <button
+                                class="btn-run"
+                                style="flex: 1"
+                                onclick="sendBatch()"
+                            >
+                                📦 Send Batch
+                            </button>
+                            <button
+                                onclick="fillSample()"
+                                style="
+                                    padding: 10px 14px;
+                                    border-radius: 8px;
+                                    border: 1px solid var(--border2);
+                                    background: transparent;
+                                    color: var(--text2);
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-family: &quot;Syne&quot;, sans-serif;
+                                "
+                            >
+                                Fill Sample
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">Batch Results</div>
+                        <div id="batchOut">
+                            <div
+                                style="
+                                    text-align: center;
+                                    padding: 60px 20px;
+                                    color: var(--text2);
+                                    font-family:
+                                        &quot;IBM Plex Mono&quot;, monospace;
+                                    font-size: 11px;
+                                "
+                            >
+                                Results appear here after batch submission
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 3: COHORT ════════════════════════════════════════ -->
+            <div id="tab-cohort" class="panel">
+                <div class="three-col" style="margin-bottom: 16px">
+                    <div class="card">
+                        <div class="card-hd">Demographics</div>
+                        <div class="sr">
+                            <span class="sk">Total</span
+                            ><span class="sv c-cy">268</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Male</span
+                            ><span class="sv c-df">175 (65%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Female</span
+                            ><span class="sv c-dhf">93 (35%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Age range</span
+                            ><span class="sv">10–99 yrs</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Peak age</span
+                            ><span class="sv">40–49 yrs</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Deaths</span
+                            ><span class="sv c-dss">5 (2%)</span>
+                        </div>
+                        <button
+                            onclick="fetchCohort()"
+                            style="
+                                width: 100%;
+                                margin-top: 12px;
+                                padding: 8px;
+                                border-radius: 6px;
+                                border: 1px solid var(--cyan);
+                                background: var(--cyan-dim);
+                                color: var(--cyan);
+                                cursor: pointer;
+                                font-size: 10px;
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                            "
+                        >
+                            Fetch /cohort/stats live →
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">Classification</div>
+                        <div class="sr">
+                            <span class="sk">DF</span
+                            ><span class="sv c-df">168 (62.6%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">DHF</span
+                            ><span class="sv c-dhf">83 (31%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">DSS</span
+                            ><span class="sv c-dss">17 (6.34%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">DSS mortality</span
+                            ><span class="sv c-dss">18% (3/17)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">IgM only</span
+                            ><span class="sv">111 (41.4%)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">IgM+IgG</span
+                            ><span class="sv">90 (33.6%)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">Hematological Means (WHO)</div>
+                        <div class="sr">
+                            <span class="sk">Plt DF</span
+                            ><span class="sv c-df">120 ×10³</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Plt DHF</span
+                            ><span class="sv c-dhf">68 ×10³</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Plt DSS</span
+                            ><span class="sv c-dss">28 ×10³</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">HCT DHF</span
+                            ><span class="sv c-dhf">48% (≥20% rise)</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">Albumin DSS</span
+                            ><span class="sv c-dss">2.9 g/dL</span>
+                        </div>
+                        <div class="sr">
+                            <span class="sk">WBC dengue</span
+                            ><span class="sv">&lt;5 (leukopenia)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-hd">
+                            Liver Enzymes · Pakistan 2023 Cohort
+                        </div>
+                        <canvas id="cohortChart" height="230"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">Hematological Markers (WHO)</div>
+                        <canvas id="hemaChart" height="230"></canvas>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 16px">
+                    <div class="card-hd">Live · GET /cohort/stats</div>
+                    <div class="json-box" id="cohortJson">
+                        // Click "Fetch /cohort/stats live" above
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 4: WHO CRITERIA ══════════════════════════════════ -->
+            <div id="tab-criteria" class="panel">
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-hd">
+                            WHO 2009 Dengue Classification
+                        </div>
+                        <table class="who-table">
+                            <tr>
+                                <th>Criterion</th>
+                                <th>DF</th>
+                                <th>DHF</th>
+                                <th>DSS</th>
+                            </tr>
+                            <tr>
+                                <td>Fever</td>
+                                <td class="tag-df">Present</td>
+                                <td class="tag-dhf">Present</td>
+                                <td class="tag-dss">May be absent</td>
+                            </tr>
+                            <tr>
+                                <td>Platelets</td>
+                                <td class="tag-df">Any</td>
+                                <td class="tag-dhf">&lt;100,000/μL</td>
+                                <td class="tag-dss">&lt;100,000/μL</td>
+                            </tr>
+                            <tr>
+                                <td>HCT rise</td>
+                                <td class="tag-df">Any</td>
+                                <td class="tag-dhf">≥20%</td>
+                                <td class="tag-dss">≥20%</td>
+                            </tr>
+                            <tr>
+                                <td>Haemorrhage</td>
+                                <td class="tag-df">Absent/mild</td>
+                                <td class="tag-dhf">Present</td>
+                                <td class="tag-dss">Present</td>
+                            </tr>
+                            <tr>
+                                <td>Circulatory shock</td>
+                                <td class="tag-df">Absent</td>
+                                <td class="tag-dhf">Absent</td>
+                                <td class="tag-dss">Present</td>
+                            </tr>
+                            <tr>
+                                <td>Albumin</td>
+                                <td class="tag-df">Normal</td>
+                                <td class="tag-dhf">May fall</td>
+                                <td class="tag-dss">&lt;3.5 g/dL</td>
+                            </tr>
+                            <tr>
+                                <td>Bilirubin</td>
+                                <td class="tag-df">Normal</td>
+                                <td class="tag-dhf">May rise</td>
+                                <td class="tag-dss">&gt;2.0 mg/dL</td>
+                            </tr>
+                            <tr>
+                                <td>AST elevation</td>
+                                <td class="tag-df">73%</td>
+                                <td class="tag-dhf">91%</td>
+                                <td class="tag-dss">100%</td>
+                            </tr>
+                            <tr>
+                                <td>ALP (sig.)</td>
+                                <td class="tag-df">No</td>
+                                <td class="tag-dhf">No</td>
+                                <td class="tag-dss">Yes (p≤0.05)</td>
+                            </tr>
+                        </table>
+                        <div
+                            style="
+                                background: rgba(245, 197, 24, 0.06);
+                                border: 1px solid rgba(245, 197, 24, 0.2);
+                                border-radius: 7px;
+                                padding: 9px 12px;
+                                margin-top: 12px;
+                                font-size: 10px;
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                color: var(--yellow);
+                                line-height: 1.7;
+                            "
+                        >
+                            ⚠ KEY FIX: High AST alone cannot classify as DHF.<br />
+                            DHF REQUIRES: Plt &lt;100k AND Hematocrit rise ≥20%.
+                        </div>
+                        <button
+                            onclick="fetchWHO()"
+                            style="
+                                width: 100%;
+                                margin-top: 10px;
+                                padding: 8px;
+                                border-radius: 6px;
+                                border: 1px solid var(--cyan);
+                                background: var(--cyan-dim);
+                                color: var(--cyan);
+                                cursor: pointer;
+                                font-size: 10px;
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                            "
+                        >
+                            Fetch /criteria/who live →
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">
+                            Physics ODE System · 7 State Variables
+                        </div>
+                        <div
+                            style="
+                                background: #020407;
+                                border: 1px solid var(--border);
+                                border-radius: 7px;
+                                padding: 14px;
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 10px;
+                                color: var(--green);
+                                line-height: 2.2;
+                                margin-bottom: 14px;
+                            "
+                        >
+                            dV/dt = β·T·V − δ·V<br />
+                            dT/dt = −β·T·V + r·T<br />
+                            dAST/dt = α₁·V − γ·AST &nbsp;<span
+                                style="color: var(--faint)"
+                                >// α₁=0.82 highest (thesis)</span
+                            ><br />
+                            dALT/dt = α₂·V − γ·ALT &nbsp;<span
+                                style="color: var(--faint)"
+                                >// α₂=0.61</span
+                            ><br />
+                            dALP/dt = α₃·V − γ·ALP &nbsp;<span
+                                style="color: var(--faint)"
+                                >// α₃=0.28</span
+                            ><br />
+                            dPlt/dt = −k_plt·V·Plt/100
+                            <span style="color: var(--faint)"
+                                >// thrombocytopenia</span
+                            ><br />
+                            dAlb/dt = −k_alb·V
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span
+                                style="color: var(--faint)"
+                                >// plasma leakage</span
+                            >
+                        </div>
+                        <div class="card-hd">Live · GET /criteria/who</div>
+                        <div
+                            class="json-box"
+                            id="whoJson"
+                            style="max-height: 200px"
+                        >
+                            // Click "Fetch /criteria/who live" above
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 5: SETUP ════════════════════════════════════════ -->
+            <div id="tab-setup" class="panel">
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-hd">Setup Instructions</div>
+                        <div
+                            style="
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 11px;
+                                line-height: 2.2;
+                                color: var(--text);
+                            "
+                        >
+                            <div style="color: var(--cyan); margin-bottom: 6px">
+                                1. Install dependencies
+                            </div>
+                            <div
+                                style="
+                                    background: #020407;
+                                    border: 1px solid var(--border);
+                                    border-radius: 7px;
+                                    padding: 12px;
+                                    color: var(--green);
+                                    margin-bottom: 14px;
+                                "
+                            >
+                                pip3 install fastapi uvicorn torch<br />
+                                pip3 install scikit-learn numpy joblib
+                            </div>
+                            <div style="color: var(--cyan); margin-bottom: 6px">
+                                2. Start server (trains automatically on first
+                                run)
+                            </div>
+                            <div
+                                style="
+                                    background: #020407;
+                                    border: 1px solid var(--border);
+                                    border-radius: 7px;
+                                    padding: 12px;
+                                    color: var(--green);
+                                    margin-bottom: 14px;
+                                "
+                            >
+                                cd ~/Desktop/dengue<br />
+                                python3 "dengue pinn.py"<br />
+                                <span style="color: var(--faint)"
+                                    ># Trains ~10k epochs then starts
+                                    serving</span
+                                ><br />
+                                <span style="color: var(--faint)"
+                                    ># Saves: dengue_pinn13_best.pth</span
+                                >
+                            </div>
+                            <div style="color: var(--cyan); margin-bottom: 6px">
+                                3. Test health endpoint
+                            </div>
+                            <div
+                                style="
+                                    background: #020407;
+                                    border: 1px solid var(--border);
+                                    border-radius: 7px;
+                                    padding: 12px;
+                                    color: var(--green);
+                                    margin-bottom: 14px;
+                                "
+                            >
+                                curl http://localhost:8000/health<br />
+                                <span style="color: var(--faint)"
+                                    ># →
+                                    {"status":"ok","trained":true,...}</span
+                                >
+                            </div>
+                            <div style="color: var(--cyan); margin-bottom: 6px">
+                                4. No PyTorch? Use Mock Mode
+                            </div>
+                            <div
+                                style="
+                                    background: rgba(245, 197, 24, 0.06);
+                                    border: 1px solid rgba(245, 197, 24, 0.2);
+                                    border-radius: 7px;
+                                    padding: 12px;
+                                    color: var(--yellow);
+                                    margin-bottom: 14px;
+                                "
+                            >
+                                Click <strong>Mock ON</strong> in the top
+                                bar.<br />
+                                No server needed — uses rule-based WHO logic.<br />
+                                pip3 install fastapi uvicorn numpy pydantic
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-hd">API Endpoint Reference</div>
+                        <div
+                            style="
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 11px;
+                                line-height: 2.4;
+                                color: var(--text);
+                                margin-bottom: 14px;
+                            "
+                        >
+                            <div>
+                                <span style="color: var(--green)">GET </span
+                                ><span style="color: var(--cyan)">/health</span
+                                ><span style="color: var(--faint)">
+                                    — liveness + model status</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--dhf)">POST</span>
+                                <span style="color: var(--cyan)">/predict</span
+                                ><span style="color: var(--faint)">
+                                    — single patient (13 fields)</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--dhf)">POST</span>
+                                <span style="color: var(--cyan)"
+                                    >/predict/batch</span
+                                ><span style="color: var(--faint)">
+                                    — up to 50 patients</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--green)">GET </span
+                                ><span style="color: var(--cyan)"
+                                    >/cohort/stats</span
+                                ><span style="color: var(--faint)">
+                                    — thesis reference data</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--green)">GET </span
+                                ><span style="color: var(--cyan)"
+                                    >/criteria/who</span
+                                ><span style="color: var(--faint)">
+                                    — WHO 2009 thresholds</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--green)">GET </span
+                                ><span style="color: var(--cyan)">/docs</span
+                                ><span style="color: var(--faint)">
+                                    — Swagger UI (interactive)</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--green)">GET </span
+                                ><span style="color: var(--cyan)">/redoc</span
+                                ><span style="color: var(--faint)">
+                                    — ReDoc documentation</span
+                                >
+                            </div>
+                        </div>
+                        <div class="card-hd">Files Produced by Training</div>
+                        <div
+                            style="
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 10px;
+                                line-height: 2.2;
+                                color: var(--text);
+                            "
+                        >
+                            <div>
+                                <span style="color: var(--yellow)"
+                                    >dengue_model.pth</span
+                                >
+                                <span style="color: var(--faint)"
+                                    >PyTorch weights + metadata</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--yellow)"
+                                    >dengue_scaler.pkl</span
+                                >
+                                <span style="color: var(--faint)"
+                                    >sklearn StandardScaler</span
+                                >
+                            </div>
+                            <div>
+                                <span style="color: var(--yellow)"
+                                    >dengue_scaler_params.json</span
+                                >
+                                <span style="color: var(--faint)"
+                                    >Scaler mean/std for JS</span
+                                >
+                            </div>
+                        </div>
+                        <div class="card-hd" style="margin-top: 14px">
+                            Model Architecture (13→3)
+                        </div>
+                        <div
+                            style="
+                                background: #020407;
+                                border: 1px solid var(--border);
+                                border-radius: 7px;
+                                padding: 12px;
+                                font-family:
+                                    &quot;IBM Plex Mono&quot;, monospace;
+                                font-size: 10px;
+                                color: var(--cyan);
+                                line-height: 2;
+                            "
+                        >
+                            Input(13) → Linear(128) → Tanh<br />
+                            → Linear(64) → Tanh<br />
+                            → Linear(32) → Tanh<br />
+                            ├─ StateHead → Sigmoid → ×scales → ODE loss<br />
+                            └─ SeverityHead → Linear(3) → Softmax+WHO gate →
+                            DF/DHF/DSS
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+        <script>
+            "use strict";
+
+            // ── Tiny helpers ───────────────────────────────────────────────
+            const V = (id, v) => (document.getElementById(id).textContent = v);
+            const f1 = (v) => parseFloat(v).toFixed(1);
+            const $ = (id) => document.getElementById(id);
+            const api = () =>
+                ($("apiBase").value || "http://localhost:8000").replace(
+                    /\/$/,
+                    "",
+                );
+
+            // ── Mock mode ───────────────────────────────────────────────────
+            let mockMode = false;
+            function toggleMock() {
+                mockMode = !mockMode;
+                const btn = $("mockToggle");
+                if (mockMode) {
+                    btn.textContent = "Mock ON";
+                    btn.style.background = "rgba(245,197,24,.22)";
+                    btn.style.color = "var(--yellow)";
+                    log(
+                        "Mock mode ON — /predict/mock (rule-based, no ML needed)",
+                        "ll-warn",
+                    );
+                } else {
+                    btn.textContent = "Mock OFF";
+                    btn.style.background = "rgba(245,197,24,.08)";
+                    btn.style.color = "var(--yellow)";
+                    log(
+                        "Mock mode OFF — using real /predict (PINN model)",
+                        "ll-info",
+                    );
+                }
+            }
+            const predictEndpoint = () =>
+                mockMode ? "/predict/mock" : "/predict";
+
+            function log(msg, cls = "ll-dim") {
+                const b = $("logbox"),
+                    d = document.createElement("div");
+                d.className = "ll " + cls;
+                d.textContent =
+                    "[" + new Date().toLocaleTimeString() + "] " + msg;
+                b.appendChild(d);
+                b.scrollTop = b.scrollHeight;
+            }
+            function setStatus(state, msg) {
+                const dot = $("dot"),
+                    txt = $("statusTxt");
+                dot.className =
+                    "dot" +
+                    (state === "ok"
+                        ? " ok"
+                        : state === "err"
+                          ? " err"
+                          : " checking");
+                txt.textContent = msg;
+            }
+
+            // ── Health check ───────────────────────────────────────────────
+            async function ping() {
+                setStatus("checking", "checking...");
+                log("GET " + api() + "/health", "ll-info");
+                try {
+                    const r = await fetch(api() + "/health");
+                    const d = await r.json();
+                    const trained = d.trained
+                        ? "trained model"
+                        : "fallback weights";
+                    setStatus("ok", "online · " + trained);
+                    log(
+                        "Health OK: trained=" +
+                            d.trained +
+                            " features=" +
+                            d.n_features,
+                        d.trained ? "ll-ok" : "ll-warn",
+                    );
+                    if (!d.trained)
+                        log(
+                            "⚠ Run python3 dengue_train.py to train the model",
+                            "ll-warn",
+                        );
+                } catch (e) {
+                    setStatus("err", "unreachable");
+                    log("Health FAIL: " + e.message, "ll-err");
+                    log(
+                        'Run: python3 "dengue pinn.py"  — or enable Mock ON',
+                        "ll-warn",
+                    );
+                }
+            }
+
+            // ── Build payload from form ────────────────────────────────────
+            function getPayload() {
+                return {
+                    age: parseInt($("age").value),
+                    sex: $("sex").value,
+                    tday: parseInt($("tday").value),
+                    alt: parseFloat($("alt").value),
+                    ast: parseFloat($("ast").value),
+                    alp: parseFloat($("alp").value),
+                    bil: parseFloat($("bil").value),
+                    alb: parseFloat($("alb").value),
+                    plt: parseFloat($("plt").value),
+                    hct: parseFloat($("hct").value),
+                    wbc: parseFloat($("wbc").value),
+                    urea: parseFloat($("urea").value),
+                    creat: parseFloat($("creat").value),
+                };
+            }
+
+            // ── Main prediction ────────────────────────────────────────────
+            let trajC = null;
+
+            async function runPredict() {
+                const btn = $("btnRun");
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spin"></span>${mockMode ? "Running Mock..." : "Calling API..."}`;
+                const payload = getPayload();
+                const ep = predictEndpoint();
+                log(
+                    `POST ${ep} | Plt=${payload.plt} HCT=${payload.hct} AST=${payload.ast}`,
+                    "ll-info",
+                );
+
+                try {
+                    const res = await fetch(api() + ep, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
+                    if (!res.ok) {
+                        const e = await res.json();
+                        throw new Error(JSON.stringify(e.detail || e));
+                    }
+                    const r = await res.json();
+                    $("jsonBox").textContent = JSON.stringify(r, null, 2);
+                    renderOutput(r);
+                    const src =
+                        r.model_trained === false
+                            ? "⚠ MOCK (rule-based)"
+                            : "PINN model";
+                    log(
+                        `Result: ${r.severity} (${(r.confidence * 100).toFixed(1)}%) | WHO:${r.who_dhf_met} | ${r.processing_ms}ms | ${src}`,
+                        r.model_trained === false ? "ll-warn" : "ll-ok",
+                    );
+                } catch (e) {
+                    log("ERROR: " + e.message, "ll-err");
+                    $("output").innerHTML = `
+      <div style="background:var(--red-dim);border:1px solid rgba(240,62,62,.3);border-radius:9px;
+        padding:18px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--red);line-height:2;">
+        <strong>API Error</strong><br>${e.message}<br><br>
+        Ensure the server is running:<br>
+        <span style="color:var(--cyan)">python3 "dengue pinn.py"</span><br><br>
+        Or enable <span style="color:var(--yellow)">Mock ON</span> in the top bar to test without a server.
+      </div>`;
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = mockMode
+                        ? "▶ Run Mock Predict"
+                        : "▶ Run PINN via FastAPI";
+                }
+            }
+
+            // ── Render prediction output ───────────────────────────────────
+            function renderOutput(r) {
+                const sev = r.severity;
+                const col =
+                    sev === "DF"
+                        ? "var(--df)"
+                        : sev === "DHF"
+                          ? "var(--dhf)"
+                          : "var(--dss)";
+                const cCls =
+                    sev === "DF" ? "c-df" : sev === "DHF" ? "c-dhf" : "c-dss";
+                const pr = r.probs;
+
+                // Probability bars
+                const probBars = ["DF", "DHF", "DSS"]
+                    .map((k) => {
+                        const v = pr[k],
+                            c =
+                                k === "DF"
+                                    ? "var(--df)"
+                                    : k === "DHF"
+                                      ? "var(--dhf)"
+                                      : "var(--dss)";
+                        return `<div class="pb-row">
+      <div class="pb-hd"><span style="color:${c}">${k}</span><span style="color:${c}">${(v * 100).toFixed(1)}%</span></div>
+      <div class="prog"><div class="progf" style="width:${v * 100}%;background:${c}"></div></div>
+    </div>`;
+                    })
+                    .join("");
+
+                // Marker flag cards from API response
+                const flags = r.marker_flags || [];
+                const refMax = {
+                    Platelet: 400,
+                    Hematocrit: 65,
+                    WBC: 15,
+                    Albumin: 6,
+                    Bilirubin: 15,
+                    AST: 800,
+                    ALT: 700,
+                    ALP: 2500,
+                };
+                const flagCards = flags
+                    .map((f) => {
+                        const c = f.flagged ? "var(--red)" : "var(--green)";
+                        const pct = Math.min(
+                            100,
+                            (f.value / (refMax[f.marker] || 100)) * 75,
+                        );
+                        return `<div class="flag-box ${f.flagged ? "flagged" : ""}">
+      <div class="flag-name">${f.marker}</div>
+      <div class="flag-bar-wrap"><div class="flag-bar" style="width:${pct}%;background:${c}"></div></div>
+      <div class="flag-vals">
+        <span style="color:${c};font-weight:600">${f.value} ${f.unit}</span>
+        <span style="color:${f.flagged ? "var(--red)" : "var(--faint)"};font-size:9px;">${f.message}</span>
+      </div>
+    </div>`;
+                    })
+                    .join("");
+
+                // Who gate line
+                const whoLine = r.who_dhf_met
+                    ? `<div class="who-met">⚠ WHO DHF criteria MET — Plt&lt;100k + HCT rise ${r.hct_rise_pct}%</div>`
+                    : `<div class="who-ok">✓ WHO DHF criteria NOT met — HCT rise: ${r.hct_rise_pct}% (below ≥20% threshold)</div>`;
+
+                // Trained badge
+                const trainedBadge = r.model_trained
+                    ? `<span style="color:var(--green);font-size:9px;font-family:'IBM Plex Mono',monospace;">✓ trained model</span>`
+                    : `<span style="color:var(--yellow);font-size:9px;font-family:'IBM Plex Mono',monospace;">⚠ fallback weights</span>`;
+
+                const mockBadge =
+                    r.model_trained === false
+                        ? `<div style="background:rgba(245,197,24,.12);border:1px solid rgba(245,197,24,.3);border-radius:6px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--yellow);text-align:center;margin-bottom:10px;">⚠ MOCK MODE — Rule-based prediction, no ML model</div>`
+                        : "";
+
+                $("output").innerHTML = `
+    ${mockBadge}
+
+    <!-- BIG SEVERITY BANNER -->
+    <div style="background:${col}18;border:2px solid ${col}55;border-radius:14px;padding:20px;text-align:center;margin-bottom:12px;position:relative;overflow:hidden;">
+      <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,${col}12,transparent 70%);pointer-events:none;"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;color:${col};opacity:.7;margin-bottom:6px;">PREDICTED SEVERITY</div>
+      <div style="font-size:48px;font-weight:800;color:${col};line-height:1;margin-bottom:4px;font-family:'Syne',sans-serif;letter-spacing:-1px;">${sev}</div>
+      <div style="font-size:14px;color:${col};opacity:.85;font-weight:600;margin-bottom:10px;">${r.severity_name}</div>
+      <div style="display:inline-block;background:${col}22;border:1px solid ${col}44;border-radius:20px;padding:4px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${col};font-weight:700;">
+        ${(r.confidence * 100).toFixed(1)}% confidence
+      </div>
+      <div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text2);">${trainedBadge} · ${r.processing_ms}ms</div>
+    </div>
+
+    <!-- PROBABILITY BARS -->
+    <div class="prob-section" style="margin-bottom:10px;">
+      <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--cyan);letter-spacing:2.5px;margin-bottom:10px;">SEVERITY PROBABILITIES · WHO-gated</div>
+      ${probBars}
+    </div>
+
+    <!-- INDICES ROW -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div class="om"><div class="om-l">HEPATIC</div><div class="om-v" style="font-size:20px;color:var(--orange)">${r.hepatic_index}</div><div class="om-s">AST·ALT·ALP</div></div>
+      <div class="om"><div class="om-l">RENAL</div><div class="om-v" style="font-size:20px;color:var(--cyan)">${r.renal_index}</div><div class="om-s">Urea·Creat</div></div>
+      <div class="om"><div class="om-l">HEMA</div><div class="om-v" style="font-size:20px;color:var(--cyan)">${r.hema_index}</div><div class="om-s">Plt·HCT</div></div>
+    </div>
+
+    <!-- MARKER FLAGS -->
+    <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--cyan);letter-spacing:2.5px;margin-bottom:7px;">MARKER FLAGS</div>
+    <div class="flag-grid" style="margin-bottom:10px;">${flagCards}</div>
+
+    <!-- WHO STATUS -->
+    ${whoLine}
+  `;
+
+                // Draw ODE trajectory from API data
+                const traj = r.trajectory;
+                if (traj) {
+                    $("traj-card").style.display = "block";
+                    setTimeout(() => {
+                        const ctx = $("trajChart").getContext("2d");
+                        if (trajC) trajC.destroy();
+                        trajC = new Chart(ctx, {
+                            type: "line",
+                            data: {
+                                labels: traj.labels,
+                                datasets: [
+                                    {
+                                        label: "AST",
+                                        data: traj.ast,
+                                        borderColor: "#f03e3e",
+                                        backgroundColor: "rgba(240,62,62,.07)",
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                    },
+                                    {
+                                        label: "ALT",
+                                        data: traj.alt,
+                                        borderColor: "#f97316",
+                                        backgroundColor: "rgba(249,115,22,.05)",
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                    },
+                                    {
+                                        label: "ALP",
+                                        data: traj.alp,
+                                        borderColor: "#05d877",
+                                        backgroundColor: "rgba(5,216,119,.04)",
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                    },
+                                    {
+                                        label: "Plt×10",
+                                        data: traj.plt.map((v) => v * 10),
+                                        borderColor: "#00cfff",
+                                        backgroundColor: "rgba(0,207,255,.04)",
+                                        tension: 0.4,
+                                        fill: false,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                        borderDash: [5, 3],
+                                    },
+                                ],
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: {
+                                        labels: {
+                                            color: "#7a9ab5",
+                                            font: {
+                                                size: 10,
+                                                family: "IBM Plex Mono",
+                                            },
+                                        },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            color: "#7a9ab5",
+                                            font: { size: 9 },
+                                        },
+                                        grid: { color: "rgba(22,40,64,.5)" },
+                                    },
+                                    y: {
+                                        ticks: {
+                                            color: "#7a9ab5",
+                                            font: { size: 9 },
+                                        },
+                                        grid: { color: "rgba(22,40,64,.5)" },
+                                        title: {
+                                            display: true,
+                                            text: "IU/L (Plt×10)",
+                                            color: "#7a9ab5",
+                                            font: { size: 9 },
+                                        },
+                                    },
+                                },
+                            },
+                        });
+                    }, 80);
+                }
+            }
+
+            // ── Presets ────────────────────────────────────────────────────
+            const PRESETS = {
+                df: {
+                    age: 40,
+                    sex: "male",
+                    tday: 4,
+                    alt: 78,
+                    ast: 90,
+                    alp: 220,
+                    urea: 31,
+                    creat: 1.1,
+                    plt: 120,
+                    hct: 42,
+                    wbc: 4.2,
+                    alb: 4.1,
+                    bil: 0.7,
+                },
+                dhf: {
+                    age: 45,
+                    sex: "male",
+                    tday: 6,
+                    alt: 110,
+                    ast: 155,
+                    alp: 282,
+                    urea: 34,
+                    creat: 1.2,
+                    plt: 65,
+                    hct: 52,
+                    wbc: 3.1,
+                    alb: 3.4,
+                    bil: 1.4,
+                },
+                dss: {
+                    age: 42,
+                    sex: "female",
+                    tday: 7,
+                    alt: 232,
+                    ast: 315,
+                    alp: 683,
+                    urea: 31,
+                    creat: 1.0,
+                    plt: 24,
+                    hct: 56,
+                    wbc: 2.1,
+                    alb: 2.8,
+                    bil: 2.9,
+                },
+            };
+
+            function setSlider(id, val, dispId, fmt) {
+                $(id).value = val;
+                $(dispId).textContent = fmt ? fmt(val) : val;
+            }
+            function loadPreset(k) {
+                const p = PRESETS[k];
+                setSlider("alt", p.alt, "alt-v");
+                setSlider("ast", p.ast, "ast-v");
+                setSlider("alp", p.alp, "alp-v");
+                setSlider("urea", p.urea, "urea-v");
+                setSlider("creat", p.creat, "creat-v", (v) =>
+                    parseFloat(v).toFixed(1),
+                );
+                setSlider("tday", p.tday, "td-v");
+                setSlider("plt", p.plt, "plt-v");
+                setSlider("hct", p.hct, "hct-v");
+                setSlider("wbc", p.wbc, "wbc-v", (v) =>
+                    parseFloat(v).toFixed(1),
+                );
+                setSlider("alb", p.alb, "alb-v", (v) =>
+                    parseFloat(v).toFixed(1),
+                );
+                setSlider("bil", p.bil, "bil-v", (v) =>
+                    parseFloat(v).toFixed(1),
+                );
+                $("sex").value = p.sex;
+                $("age").value = p.age;
+                log("Loaded " + k.toUpperCase() + " preset", "ll-warn");
+                runPredict();
+            }
+
+            // ── Batch ──────────────────────────────────────────────────────
+            function fillSample() {
+                const sample = {
+                    patients: [
+                        {
+                            age: 40,
+                            sex: "male",
+                            tday: 4,
+                            alt: 78,
+                            ast: 90,
+                            alp: 220,
+                            bil: 0.7,
+                            alb: 4.1,
+                            plt: 120,
+                            hct: 42,
+                            wbc: 4.2,
+                            urea: 31,
+                            creat: 1.1,
+                        },
+                        {
+                            age: 45,
+                            sex: "male",
+                            tday: 6,
+                            alt: 110,
+                            ast: 155,
+                            alp: 282,
+                            bil: 1.4,
+                            alb: 3.4,
+                            plt: 65,
+                            hct: 52,
+                            wbc: 3.1,
+                            urea: 34,
+                            creat: 1.2,
+                        },
+                        {
+                            age: 42,
+                            sex: "female",
+                            tday: 7,
+                            alt: 232,
+                            ast: 315,
+                            alp: 683,
+                            bil: 2.9,
+                            alb: 2.8,
+                            plt: 24,
+                            hct: 56,
+                            wbc: 2.1,
+                            urea: 31,
+                            creat: 1.0,
+                        },
+                        {
+                            age: 38,
+                            sex: "male",
+                            tday: 5,
+                            alt: 95,
+                            ast: 200,
+                            alp: 250,
+                            bil: 0.6,
+                            alb: 4.3,
+                            plt: 160,
+                            hct: 43,
+                            wbc: 5.0,
+                            urea: 30,
+                            creat: 1.0,
+                        },
+                    ],
+                };
+                $("batchJson").value = JSON.stringify(sample, null, 2);
+            }
+
+            async function sendBatch() {
+                let payload;
+                try {
+                    payload = JSON.parse($("batchJson").value);
+                } catch (e) {
+                    alert("Invalid JSON: " + e.message);
+                    return;
+                }
+                log(
+                    "POST /predict/batch | " +
+                        payload.patients.length +
+                        " patients",
+                    "ll-info",
+                );
+                try {
+                    const res = await fetch(api() + "/predict/batch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
+                    if (!res.ok) {
+                        const e = await res.json();
+                        throw new Error(JSON.stringify(e.detail || e));
+                    }
+                    const d = await res.json();
+                    log("Batch done: " + JSON.stringify(d.summary), "ll-ok");
+                    renderBatch(d);
+                } catch (e) {
+                    log("Batch error: " + e.message, "ll-err");
+                }
+            }
+
+            function renderBatch(d) {
+                const cards = d.results
+                    .map((r, i) => {
+                        const col =
+                            r.severity === "DF"
+                                ? "var(--df)"
+                                : r.severity === "DHF"
+                                  ? "var(--dhf)"
+                                  : "var(--dss)";
+                        const pr = r.probs;
+                        return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;
+      padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2)">Patient ${i + 1}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${r.who_dhf_met ? '<span style="font-size:9px;color:var(--yellow)">⚠ WHO</span>' : ""}
+          <span style="padding:3px 10px;border-radius:14px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;
+            font-weight:700;background:${r.severity === "DF" ? "rgba(5,216,119,.12)" : r.severity === "DHF" ? "rgba(249,115,22,.12)" : "rgba(240,62,62,.12)"};
+            border:1px solid ${col};color:${col}">${r.severity} · ${(r.confidence * 100).toFixed(0)}%</span>
+        </div>
+      </div>
+      ${["DF", "DHF", "DSS"]
+          .map((k) => {
+              const v = pr[k],
+                  c =
+                      k === "DF"
+                          ? "var(--df)"
+                          : k === "DHF"
+                            ? "var(--dhf)"
+                            : "var(--dss)";
+              return `<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${c};width:30px;font-weight:700">${k}</span>
+          <div style="flex:1;background:var(--border);border-radius:2px;height:3px;overflow:hidden;">
+            <div style="height:100%;background:${c};width:${v * 100}%;"></div></div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${c};width:36px;text-align:right">${(v * 100).toFixed(1)}%</span>
+        </div>`;
+          })
+          .join("")}
+    </div>`;
+                    })
+                    .join("");
+
+                $("batchOut").innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+      ${["DF", "DHF", "DSS"]
+          .map((k) => {
+              const col =
+                  k === "DF"
+                      ? "var(--df)"
+                      : k === "DHF"
+                        ? "var(--dhf)"
+                        : "var(--dss)";
+              return `<div style="text-align:center;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:12px;">
+          <div style="font-size:8px;font-family:'IBM Plex Mono',monospace;color:var(--text2);letter-spacing:2px">${k}</div>
+          <div style="font-size:28px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${col}">${d.summary[k] || 0}</div>
+        </div>`;
+          })
+          .join("")}
+    </div>
+    <div style="max-height:450px;overflow-y:auto;">${cards}</div>`;
+            }
+
+            // ── Live API fetches ───────────────────────────────────────────
+            async function fetchCohort() {
+                try {
+                    const r = await fetch(api() + "/cohort/stats");
+                    const d = await r.json();
+                    $("cohortJson").textContent = JSON.stringify(d, null, 2);
+                    log("Fetched /cohort/stats", "ll-ok");
+                } catch (e) {
+                    log("Cohort fetch failed: " + e.message, "ll-err");
+                }
+            }
+            async function fetchWHO() {
+                try {
+                    const r = await fetch(api() + "/criteria/who");
+                    const d = await r.json();
+                    $("whoJson").textContent = JSON.stringify(d, null, 2);
+                    log("Fetched /criteria/who", "ll-ok");
+                } catch (e) {
+                    log("WHO fetch failed: " + e.message, "ll-err");
+                }
+            }
+
+            // ── Tab switching ──────────────────────────────────────────────
+            function switchTab(el) {
+                const n = el.getAttribute("data-tab");
+                document
+                    .querySelectorAll(".tab")
+                    .forEach((t) => t.classList.remove("active"));
+                document
+                    .querySelectorAll(".panel")
+                    .forEach((p) => p.classList.remove("active"));
+                el.classList.add("active");
+                $("tab-" + n).classList.add("active");
+                if (n === "cohort") setTimeout(renderCohortCharts, 80);
+            }
+
+            // ── Cohort charts ──────────────────────────────────────────────
+            let cC = null,
+                hC = null;
+            function renderCohortCharts() {
+                const opts = {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: "#7a9ab5",
+                                font: { size: 10, family: "IBM Plex Mono" },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: "#7a9ab5" },
+                            grid: { color: "rgba(22,40,64,.4)" },
+                        },
+                        y: {
+                            ticks: { color: "#7a9ab5" },
+                            grid: { color: "rgba(22,40,64,.4)" },
+                        },
+                    },
+                };
+
+                if (cC) cC.destroy();
+                cC = new Chart($("cohortChart").getContext("2d"), {
+                    type: "bar",
+                    data: {
+                        labels: ["Control", "DF", "DHF", "DSS"],
+                        datasets: [
+                            {
+                                label: "AST",
+                                data: [21.2, 90.4, 155.5, 314.6],
+                                backgroundColor: [
+                                    "rgba(122,154,181,.5)",
+                                    "rgba(5,216,119,.6)",
+                                    "rgba(249,115,22,.6)",
+                                    "rgba(240,62,62,.6)",
+                                ],
+                                borderColor: [
+                                    "#7a9ab5",
+                                    "#05d877",
+                                    "#f97316",
+                                    "#f03e3e",
+                                ],
+                                borderWidth: 2,
+                            },
+                            {
+                                label: "ALT",
+                                data: [22.81, 77.68, 110.17, 232.0],
+                                backgroundColor: [
+                                    "rgba(122,154,181,.3)",
+                                    "rgba(5,216,119,.3)",
+                                    "rgba(249,115,22,.3)",
+                                    "rgba(240,62,62,.3)",
+                                ],
+                                borderColor: [
+                                    "#7a9ab5",
+                                    "#05d877",
+                                    "#f97316",
+                                    "#f03e3e",
+                                ],
+                                borderWidth: 2,
+                            },
+                            {
+                                label: "ALP",
+                                data: [193.4, 218.6, 281.9, 682.6],
+                                backgroundColor: [
+                                    "rgba(0,207,255,.2)",
+                                    "rgba(0,207,255,.3)",
+                                    "rgba(0,207,255,.4)",
+                                    "rgba(0,207,255,.65)",
+                                ],
+                                borderColor: "#00cfff",
+                                borderWidth: 2,
+                            },
+                        ],
+                    },
+                    options: {
+                        ...opts,
+                        scales: {
+                            ...opts.scales,
+                            y: {
+                                ...opts.scales.y,
+                                title: {
+                                    display: true,
+                                    text: "IU/L",
+                                    color: "#7a9ab5",
+                                },
+                            },
+                        },
+                    },
+                });
+
+                if (hC) hC.destroy();
+                hC = new Chart($("hemaChart").getContext("2d"), {
+                    type: "bar",
+                    data: {
+                        labels: ["Control", "DF", "DHF", "DSS"],
+                        datasets: [
+                            {
+                                label: "Platelet (×10³/μL)",
+                                data: [220, 120, 68, 28],
+                                backgroundColor: [
+                                    "rgba(122,154,181,.5)",
+                                    "rgba(5,216,119,.6)",
+                                    "rgba(249,115,22,.6)",
+                                    "rgba(240,62,62,.6)",
+                                ],
+                                borderColor: [
+                                    "#7a9ab5",
+                                    "#05d877",
+                                    "#f97316",
+                                    "#f03e3e",
+                                ],
+                                borderWidth: 2,
+                            },
+                            {
+                                label: "WBC×10",
+                                data: [65, 42, 31, 22],
+                                backgroundColor: [
+                                    "rgba(0,207,255,.2)",
+                                    "rgba(0,207,255,.3)",
+                                    "rgba(0,207,255,.4)",
+                                    "rgba(0,207,255,.6)",
+                                ],
+                                borderColor: "#00cfff",
+                                borderWidth: 2,
+                            },
+                            {
+                                label: "Albumin×10",
+                                data: [45, 41, 34, 29],
+                                backgroundColor: [
+                                    "rgba(245,197,24,.2)",
+                                    "rgba(245,197,24,.3)",
+                                    "rgba(245,197,24,.4)",
+                                    "rgba(245,197,24,.6)",
+                                ],
+                                borderColor: "#f5c518",
+                                borderWidth: 2,
+                            },
+                        ],
+                    },
+                    options: {
+                        ...opts,
+                        scales: {
+                            ...opts.scales,
+                            y: {
+                                ...opts.scales.y,
+                                title: {
+                                    display: true,
+                                    text: "value (see legend)",
+                                    color: "#7a9ab5",
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+        </script>
+    </body>
+</html>
